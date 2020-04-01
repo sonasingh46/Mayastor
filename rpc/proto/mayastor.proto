@@ -148,17 +148,32 @@ message CreateNexusRequest {
   repeated string children = 3; // uris to the targets we connect to
 }
 
+// State of the nexus child.
+enum ChildState {
+  CHILD_INIT = 0;     // temporary state at the beginning
+  CHILD_ONLINE = 1;   // healthy and contains the latest bits
+  CHILD_REBUILD = 2;  // rebuild of the child is in progress
+  CHILD_FAULTED = 3;  // unrecoverable error
+}
+
 // represents a child device part of a nexus
 message Child {
   string uri = 1;   // uri of the child device
-  string state = 2; // TODO: enum
+  ChildState state = 2; // state of the child
+}
+
+// State of the nexus (terminology inspired by ZFS).
+enum NexusState {
+  NEXUS_ONLINE = 0;   // healthy and working
+  NEXUS_DEGRADED = 1; // not healthy but is able to serve IO (i.e. rebuild is in progress)
+  NEXUS_FAULTED = 2;   // broken and unable to serve IO
 }
 
 // represents a nexus device
 message Nexus {
   string uuid = 1;             // name of the nexus
   uint64 size = 2;             // size of the volume in bytes
-  string state = 3;            // current state of the nexus (TODO: enum)
+  NexusState state = 3;        // current state of the nexus
   repeated Child children = 4; // array of children
   // Path to device file for the volume (missing if not published).
   // Missing property and empty string are treated the same.

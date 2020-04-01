@@ -17,7 +17,7 @@ class Replica {
     this.size = props.size;
     this.share = props.share;
     this.uri = props.uri;
-    this.state = props.state;
+    this.offline = false;
   }
 
   // Stringify replica.
@@ -32,7 +32,6 @@ class Replica {
   // @param {number}   props.size     Capacity of the replica in bytes.
   // @param {string}   props.share    Share protocol of replica.
   // @param {string}   props.uri      URI to be used by nexus to access it.
-  // @param {string}   props.state    State of the replica.
   //
   merge(props) {
     let changed = false;
@@ -49,8 +48,8 @@ class Replica {
       this.uri = props.uri;
       changed = true;
     }
-    if (this.state != props.state) {
-      this.state = props.state;
+    if (this.offline) {
+      this.offline = false;
       changed = true;
     }
     if (changed) {
@@ -61,12 +60,12 @@ class Replica {
     }
   }
 
-  // Set state of the pool to offline and the same for all replicas on the pool.
+  // Set state of the replica to offline.
   // This is typically called when mayastor stops running on the node and
-  // the pool becomes inaccessible.
+  // the replicas become inaccessible.
   offline() {
     log.warn(`Replica "${this}" got offline`);
-    this.state = 'OFFLINE';
+    this.offline = true;
     this.pool.node.emit('replica', {
       eventType: 'mod',
       object: this,

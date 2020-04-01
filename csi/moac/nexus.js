@@ -112,8 +112,8 @@ class Nexus {
   // the pool becomes inaccessible.
   offline() {
     log.warn(`Nexus "${this}" got offline`);
-    this.state = 'OFFLINE';
-    this.reason = `mayastor does not run on the node "${this.node.name}"`;
+    this.state = 'NEXUS_OFFLINE';
+    this.reason = `mayastor does not run on the node "${this.node}"`;
     this._emitMod();
   }
 
@@ -203,7 +203,7 @@ class Nexus {
     }
     this.children.push({
       uri: uri,
-      state: '', // will be filled later during a sync
+      state: 'CHILD_INIT',
     });
     this.children.sort(compareChildren);
     this._emitMod();

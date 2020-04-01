@@ -38,7 +38,7 @@ class Volume {
     // state variables of the volume
     this.nexus = null;
     this.replicas = {}; // replicas indexed by node name
-    this.state = 'PENDING';
+    this.state = 'pending';
     this.reason = 'The volume is being created';
   }
 
@@ -92,6 +92,55 @@ class Volume {
       replica.destroy()
     );
     await Promise.all(promises);
+  }
+
+  kick_the_ass() {
+    if (this.state == 'pending') {
+      // nexus does not exist yet - nothing to do
+      assert(!this.nexus);
+      return;
+    }
+    // pair nexus children with replica objects to get the full picture
+    var self = this;
+    let children = this.nexus.children.map((ch) => {
+      return {
+        uri: ch.uri,
+        state: ch.state,
+        replica: self.replicas.find((r) => r.uri == ch.uri),
+      };
+    });
+
+    // If there is not a single replica that is online then there is no hope
+    // that we could rebuild something.
+    var onlineCount = children.filter((ch) => ch.state == 'CHILD_ONLINE')
+      .length;
+    if (onlineCount == 0) {
+      this.state = 'faulted';
+      return;
+    }
+
+    // If we don't have sufficient number of sound replicas (sound means online
+    // or under rebuild) then add new one.
+    var soundCount = children.filter((ch) => {
+      return ['CHILD_ONLINE', 'CHILD_REBUILD'].indexOf(ch.state) >= 0;
+    }).length;
+    if (this.replicaCount > soundCount) {
+      // add new replica
+      this._createReplicas(1).catch((err) => {
+        log.error(err.toString());
+      });
+      return;
+    }
+
+    // If we have more online replicas then we need to, then remove one.
+    // The condition for this is that there must not be any replicas under
+    // rebuild as it could fail the rebuild process.
+    var rebuildCount = children.filter((ch) => ch.state == 'CHILD_REBUILD')
+      .length;
+    if (rebuildCount == 0 && onlineCount > this.replicaCount) {
+      // TODO: rm replica
+      return;
+    }
   }
 
   // Ensure that configuration of a volume is as it should be. Create whatever
@@ -228,9 +277,9 @@ class Volume {
       );
     }
 
-    // Calculate the size of the volume if not given precisely. The size
-    // of the smallest pool is the safe choice though a bit too
-    // conservative (TODO).
+    // Calculate the size of the volume if not given precisely.
+    //
+    // TODO: Size of the smallest pool is a safe choice though too conservative.
     if (!this.size) {
       this.size = Math.min(
         pools.reduce(
