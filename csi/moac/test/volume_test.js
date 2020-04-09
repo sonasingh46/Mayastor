@@ -1,6 +1,8 @@
 // Unit tests for the volume object
 //
-// Volume ensure tests are in volumes_test.js.
+// The tests for more complex volume methods are in volumes_test.js mainly
+// because volumes.js takes care of routing registry events to the volume
+// and it makes sense to test this together.
 
 'use strict';
 
@@ -24,6 +26,54 @@ const defaultOpts = {
 };
 
 module.exports = function () {
+  var registry;
+  var node1, node2, node3;
+  var pool1, pool2, pool3;
+
+  // create test environment with three nodes
+  function createTestEnv() {
+    registry = new Registry();
+    node1 = new Node('node1');
+    node2 = new Node('node2');
+    node3 = new Node('node3');
+    // pools sorted from the most to the least preferred
+    pool1 = new Pool({
+      name: 'pool1',
+      disks: [],
+      capacity: 100,
+      used: 0,
+      state: 'POOL_ONLINE',
+    });
+    pool2 = new Pool({
+      name: 'pool2',
+      disks: [],
+      capacity: 100,
+      used: 4,
+      state: 'POOL_ONLINE',
+    });
+    pool3 = new Pool({
+      name: 'pool3',
+      disks: [],
+      capacity: 100,
+      used: 4,
+      state: 'POOL_DEGRADED',
+    });
+    // we don't want connect and disconnect to do anything
+    sinon.spy(node1, 'connect');
+    sinon.spy(node2, 'connect');
+    sinon.spy(node3, 'connect');
+    sinon.spy(node1, 'disconnect');
+    sinon.spy(node2, 'disconnect');
+    sinon.spy(node3, 'disconnect');
+
+    registry._registerNode(node1);
+    registry._registerNode(node2);
+    registry._registerNode(node3);
+    node1._registerPool(pool1);
+    node2._registerPool(pool2);
+    node3._registerPool(pool3);
+  }
+
   it('should stringify volume name', () => {
     let registry = new Registry();
     let volume = new Volume(UUID, registry, defaultOpts);
@@ -67,21 +117,23 @@ module.exports = function () {
     stub.resolves({ devicePath: '/dev/nbd0' });
     await volume.publish('nbd');
     expect(nexus.devicePath).to.equal('/dev/nbd0');
+    sinon.assert.calledOnce(stub);
+    sinon.assert.calledWithMatch(stub, 'publishNexus', {
+      uuid: UUID,
+      key: '',
+    });
 
     stub.resolves({});
     await volume.unpublish();
     expect(nexus.devicePath).to.equal('');
+    sinon.assert.calledTwice(stub);
+    sinon.assert.calledWithMatch(stub.secondCall, 'unpublishNexus', {
+      uuid: UUID,
+    });
   });
 
   it('should destroy a volume with 3 replicas', async () => {
-    let registry = new Registry();
     let volume = new Volume(UUID, registry, defaultOpts);
-    let node1 = new Node('node1');
-    let node2 = new Node('node2');
-    let node3 = new Node('node3');
-    let pool1 = new Pool({ name: 'pool1', disks: [] });
-    let pool2 = new Pool({ name: 'pool2', disks: [] });
-    let pool3 = new Pool({ name: 'pool3', disks: [] });
     let nexus = new Nexus({ uuid: UUID });
     let replica1 = new Replica({ uuid: UUID });
     let replica2 = new Replica({ uuid: UUID });
@@ -93,9 +145,6 @@ module.exports = function () {
     stub2.resolves({});
     stub3.resolves({});
     node1._registerNexus(nexus);
-    node1._registerPool(pool1);
-    node2._registerPool(pool2);
-    node3._registerPool(pool3);
     pool1.registerReplica(replica1);
     pool2.registerReplica(replica2);
     pool3.registerReplica(replica3);

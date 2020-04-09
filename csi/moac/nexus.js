@@ -203,7 +203,7 @@ class Nexus {
     }
     this.children.push({
       uri: uri,
-      state: 'CHILD_INIT',
+      state: 'CHILD_REBUILD',
     });
     this.children.sort(compareChildren);
     this._emitMod();
@@ -211,10 +211,9 @@ class Nexus {
 
   // Remove replica from nexus.
   //
-  // @param {object} replica   Replica object to remove from the nexus.
+  // @param {string} uri   URI of the replica to be removed from the nexus.
   //
-  async removeReplica(replica) {
-    let uri = replica.uri;
+  async removeReplica(uri) {
     if (!this.children.find((ch) => ch.uri == uri)) {
       return;
     }

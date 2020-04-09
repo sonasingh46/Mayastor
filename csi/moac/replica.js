@@ -17,7 +17,7 @@ class Replica {
     this.size = props.size;
     this.share = props.share;
     this.uri = props.uri;
-    this.offline = false;
+    this.isDown = false;
   }
 
   // Stringify replica.
@@ -48,8 +48,8 @@ class Replica {
       this.uri = props.uri;
       changed = true;
     }
-    if (this.offline) {
-      this.offline = false;
+    if (this.isDown) {
+      this.isDown = false;
       changed = true;
     }
     if (changed) {
@@ -65,11 +65,16 @@ class Replica {
   // the replicas become inaccessible.
   offline() {
     log.warn(`Replica "${this}" got offline`);
-    this.offline = true;
+    this.isDown = true;
     this.pool.node.emit('replica', {
       eventType: 'mod',
       object: this,
     });
+  }
+
+  // Return true if replica is offline otherwise false.
+  isOffline() {
+    return this.isDown;
   }
 
   // Export replica over given storage protocol for IO (NONE, ISCSI or NVMF).
