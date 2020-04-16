@@ -139,7 +139,9 @@ class Replica {
   bind(pool) {
     assert(!this.pool);
     this.pool = pool;
-    log.info(`Adding replica "${this}" to a list`);
+    log.debug(
+      `Adding "${this.uuid}" to the list of replicas for the pool "${pool}"`
+    );
     this.pool.node.emit('replica', {
       eventType: 'new',
       object: this,
@@ -148,7 +150,7 @@ class Replica {
 
   // Remove the replica reference from pool
   unbind() {
-    log.info(`Removing replica "${this}" from a list`);
+    log.debug(`Removing replica "${this}" from the list of replicas`);
     this.pool.unregisterReplica(this);
     this.pool.node.emit('replica', {
       eventType: 'del',

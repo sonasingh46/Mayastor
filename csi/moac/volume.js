@@ -96,6 +96,12 @@ class Volume {
 
   // Trigger the run of FSA. It will either run immediately or if it is already
   // running, it will start again when the current run finishes.
+  //
+  // Why critical section on fsa? Certain operations done by fsa are async. If
+  // we allow another process to enter fsa before the async operation is done
+  // and the state of volume updated we risk that the second process repeats
+  // exactly the same action (because from its point of view it hasn't been
+  // done yet).
   fsa() {
     if (this.runFsa++ == 0) {
       this._fsa().finally(() => {
@@ -110,11 +116,47 @@ class Volume {
   // through states: pending, degraded, faulted, healthy - trying to preserve
   // data on volume "no matter what".
   async _fsa() {
-    if (this.state == 'pending' && !this.nexus) {
+    if (!this.nexus) {
       // nexus does not exist yet - nothing to do
+      assert.equal(this.state, 'pending');
       return;
     }
     log.debug(`Volume "${this}" enters FSA in ${this.state} state`);
+
+    if (this.nexus.state == 'NEXUS_OFFLINE') {
+      // if nexus is not accessible then the information about children is stale
+      // and we cannot make any reasonable decisions, so bail out.
+      this._setState('offline');
+      return;
+    }
+
+    // check that replicas are shared as they should be
+    for (let nodeName in this.replicas) {
+      let replica = this.replicas[nodeName];
+      if (!replica.isOffline()) {
+        let share;
+        let local = replica.pool.node == this.nexus.node;
+        // make sure that replica that is local to the nexus is accessed locally
+        if (local && replica.share != 'REPLICA_NONE') {
+          share = 'REPLICA_NONE';
+        } else if (!local && replica.share == 'REPLICA_NONE') {
+          // make sure that replica that is remote to nexus can be accessed
+          share = 'REPLICA_NVMF';
+        }
+        if (share) {
+          try {
+            await replica.setShare(share);
+            // fsa will get called again because the replica was modified
+            return;
+          } catch (err) {
+            throw new GrpcError(
+              GrpcCode.INTERNAL,
+              `Failed to set share pcol to ${share} for replica "${replica}": ${err}`
+            );
+          }
+        }
+      }
+    }
     // pair nexus children with replica objects to get the full picture
     var self = this;
     let children = this.nexus.children.map((ch) => {
@@ -173,6 +215,49 @@ class Volume {
       return;
     }
 
+    assert(onlineCount >= this.replicaCount);
+    this._setState('healthy');
+
+    // If we have more online replicas then we need to, then remove one.
+    // Child that is broken and without a replica is a good fit for removal.
+    let rmChild = children.find(
+      (ch) => !ch.replica && ch.state == 'CHILD_FAULTED'
+    );
+    if (!rmChild) {
+      rmChild = children.find((ch) => ch.state == 'CHILD_FAULTED');
+      // If all replicas are online, then continue searching for a candidate
+      // only if there are more online replicas than it needs to be.
+      if (!rmChild && onlineCount > this.replicaCount) {
+        // A child that is unknown to us (without replica object)
+        rmChild = children.find((ch) => !ch.replica);
+        if (!rmChild) {
+          // The replica with the lowest score must go away
+          let rmReplica = this._prioritizeReplicas(
+            children.map((ch) => ch.replica)
+          ).pop();
+          if (rmReplica) {
+            rmChild = children.find((ch) => ch.replica == rmReplica);
+          }
+        }
+      }
+    }
+    if (rmChild) {
+      try {
+        await this.nexus.removeReplica(rmChild.uri);
+      } catch (err) {
+        log.error(err.toString());
+        return;
+      }
+      if (rmChild.replica) {
+        try {
+          await rmChild.replica.destroy();
+        } catch (err) {
+          log.error(err.toString());
+        }
+      }
+      return;
+    }
+
     // If a replica should run on a different node then move it
     var moveChild = children.find((ch) => {
       if (
@@ -188,7 +273,6 @@ class Volume {
       return false;
     });
     if (moveChild) {
-      this._setState('healthy');
       // We add a new replica and the old one will be removed when both are
       // online since there will be more of them than needed. We do one by one
       // not to trigger too many changes.
@@ -199,47 +283,6 @@ class Volume {
       }
       return;
     }
-
-    // If we have more online replicas then we need to, then remove one.
-    // The condition for this is that there must not be any replica under
-    // rebuild as it could fail the rebuild process.
-    if (onlineCount > this.replicaCount) {
-      // Child that is broken and without a replica is a good fit for removal
-      let rmChild = children.find(
-        (ch) => !ch.replica && ch.state == 'CHILD_FAULTED'
-      );
-      if (!rmChild) {
-        // A child that is unknown to us (without replica object)
-        rmChild = children.find((ch) => !ch.replica);
-        if (!rmChild) {
-          // The replica with the lowest score must go away
-          let rmReplica = this._prioritizeReplicas(
-            children.map((ch) => ch.replica)
-          ).pop();
-          if (rmReplica) {
-            rmChild = children.find((ch) => ch.replica == rmReplica);
-          }
-        }
-      }
-      if (rmChild) {
-        this._setState('healthy');
-        try {
-          await this.nexus.removeReplica(rmChild.uri);
-        } catch (err) {
-          log.error(err.toString());
-          return;
-        }
-        if (rmChild.replica) {
-          try {
-            await rmChild.replica.destroy();
-          } catch (err) {
-            log.error(err.toString());
-          }
-        }
-        return;
-      }
-    }
-    this._setState('healthy');
   }
 
   // Change the volume state to given state. If the state is not the same as
@@ -486,7 +529,6 @@ class Volume {
             `Failed to set share pcol to ${share} for replica "${replica}": ${err}`
           );
         }
-        log.info(`Share protocol for replica "${replica}" set to ${share}`);
       }
     }
     return replicaSet;

@@ -31,9 +31,10 @@ message CreatePoolRequest {
 
 // State of the storage pool (terminology comes from ZFS).
 enum PoolState {
-  POOL_ONLINE = 0;   // the pool is in normal working order
-  POOL_DEGRADED = 1; // the pool has experienced a failure but can still function
-  POOL_FAULTED = 2;  // the pool is completely inaccessible
+  POOL_UNKNOWN = 0;
+  POOL_ONLINE = 1;   // the pool is in normal working order
+  POOL_DEGRADED = 2; // the pool has experienced a failure but can still function
+  POOL_FAULTED = 3;  // the pool is completely inaccessible
 }
 
 // Storage pool properties
@@ -150,7 +151,7 @@ message CreateNexusRequest {
 
 // State of the nexus child.
 enum ChildState {
-  CHILD_INIT = 0;     // temporary state at the beginning
+  CHILD_UNKNOWN = 0;
   CHILD_ONLINE = 1;   // healthy and contains the latest bits
   CHILD_REBUILD = 2;  // rebuild of the child is in progress
   CHILD_FAULTED = 3;  // unrecoverable error
@@ -164,9 +165,10 @@ message Child {
 
 // State of the nexus (terminology inspired by ZFS).
 enum NexusState {
-  NEXUS_ONLINE = 0;   // healthy and working
-  NEXUS_DEGRADED = 1; // not healthy but is able to serve IO (i.e. rebuild is in progress)
-  NEXUS_FAULTED = 2;   // broken and unable to serve IO
+  NEXUS_UNKNOWN = 0;
+  NEXUS_ONLINE = 1;    // healthy and working
+  NEXUS_DEGRADED = 2;  // not healthy but is able to serve IO (i.e. rebuild is in progress)
+  NEXUS_FAULTED = 3;   // broken and unable to serve IO
 }
 
 // represents a nexus device

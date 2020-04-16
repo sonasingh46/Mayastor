@@ -32,7 +32,7 @@ class Nexus {
     this.devicePath = props.devicePath;
     this.state = props.state;
     // children of the nexus (replica URIs and their state)
-    this.children = [].concat(props.children).sort(compareChildren);
+    this.children = [].concat(props.children || []).sort(compareChildren);
   }
 
   // Stringify the nexus
@@ -89,7 +89,7 @@ class Nexus {
   //
   bind(node) {
     this.node = node;
-    log.info(`Adding nexus "${this}" to a list`);
+    log.debug(`Adding "${this.uuid}" to the nexus list of node "${node}"`);
     this.node.emit('nexus', {
       eventType: 'new',
       object: this,
@@ -98,7 +98,7 @@ class Nexus {
 
   // Unbind the previously bound nexus from the node.
   unbind() {
-    log.info(`Removing nexus "${this}" from a list`);
+    log.debug(`Removing "${this}" from the nexus list`);
     this.node.unregisterNexus(this);
     this.node.emit('nexus', {
       eventType: 'del',
@@ -206,6 +206,7 @@ class Nexus {
       state: 'CHILD_REBUILD',
     });
     this.children.sort(compareChildren);
+    log.info(`Replica uri "${uri}" added to the nexus "${this}"`);
     this._emitMod();
   }
 
@@ -236,6 +237,7 @@ class Nexus {
     if (idx >= 0) {
       this.children.splice(idx, 1);
     }
+    log.info(`Replica uri "${uri}" removed from the nexus "${this}"`);
     this._emitMod();
   }
 
