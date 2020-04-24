@@ -17,12 +17,12 @@ const monthShortNames = [
   'Sep',
   'Oct',
   'Nov',
-  'Dec',
+  'Dec'
 ];
 
 // This will convert ISO timestamp string to following format:
 // Oct 10 19:49:29.027
-function toLocalTime(isoTs) {
+function toLocalTime (isoTs) {
   var dt = new Date(Date.parse(isoTs));
   var pad = function (num) {
     return (num < 10 ? '0' : '') + num;
@@ -78,15 +78,15 @@ if (process.stdout.isTTY) {
 var logger = winston.createLogger({
   level: 'info',
   format: winston.format.combine(...formats),
-  transports: [new winston.transports.Console()],
+  transports: [new winston.transports.Console()]
 });
 
-function setLevel(level) {
+function setLevel (level) {
   logger.level = level;
 }
 
 // Purpose of the wrapper is to add component prefix to each log message
-function Logger(component) {
+function Logger (component) {
   var obj = Object.create(Logger.prototype);
   obj.component = component;
   obj.logger = logger;
@@ -98,7 +98,7 @@ levels.forEach((lvl) => {
   Logger.prototype[lvl] = function (msg) {
     logger[lvl].call(logger, {
       label: this.component,
-      message: msg,
+      message: msg
     });
   };
 });
@@ -106,11 +106,11 @@ levels.forEach((lvl) => {
 Logger.prototype.trace = function (msg) {
   logger.silly.call(logger, {
     component: this.component,
-    message: msg,
+    message: msg
   });
 };
 
 module.exports = {
   Logger,
-  setLevel,
+  setLevel
 };

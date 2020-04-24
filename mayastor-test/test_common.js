@@ -18,13 +18,17 @@ const SPDK_CONFIG_PATH = '/tmp/spdk_test.cfg';
 const GRPC_PORT = 10777;
 const CSI_ENDPOINT = '/tmp/mayastor_csi_test.sock';
 const CSI_ID = 'test-node-id';
+const LOCALHOST = '127.0.0.1';
 
-var endpoint = '127.0.0.1:' + GRPC_PORT;
+var endpoint = LOCALHOST + ':' + GRPC_PORT;
+var test_port = process.env.TEST_PORT || GRPC_PORT;
+var my_ip = getMyIp() || LOCALHOST;
+var grpc_endpoint = my_ip + ':' + test_port;
 // started processes indexed by the program name
 var procs = {};
 
 // Construct path to a rust binary in target/debug/... dir.
-function getCmdPath(name) {
+function getCmdPath (name) {
   return path.join(__dirname, '..', 'target', 'debug', name);
 }
 
@@ -35,26 +39,26 @@ function getCmdPath(name) {
 // TODO: Beware that glob expansion of file names works differently
 // between the two cases. When using just spawn() file names are not
 // expanded.
-function runAsRoot(cmd, args, env, nameInPs) {
+function runAsRoot (cmd, args, env, nameInPs) {
   env = env || {};
   env = _.assignIn(
     {},
     process.env,
     {
-      RUST_BACKTRACE: 1,
+      RUST_BACKTRACE: 1
     },
     env
   );
   if (process.geteuid() === 0) {
     return spawn(cmd, args || [], {
       env,
-      shell: '/bin/bash',
+      shell: '/bin/bash'
     });
   } else {
     return sudo(
       [cmd].concat(args || []),
       {
-        spawnOptions: { env },
+        spawnOptions: { env }
       },
       nameInPs
     );
@@ -63,15 +67,15 @@ function runAsRoot(cmd, args, env, nameInPs) {
 
 // Execute command as root and call callback with (error, stdout) arguments
 // when the command has finished.
-function execAsRoot(cmd, args, done) {
-  let child = runAsRoot(cmd, args);
+function execAsRoot (cmd, args, done) {
+  const child = runAsRoot(cmd, args);
   let stderr = '';
   let stdout = '';
 
-  child.stderr.on('data', data => {
+  child.stderr.on('data', (data) => {
     stderr += data;
   });
-  child.stdout.on('data', data => {
+  child.stdout.on('data', (data) => {
     stdout += data;
   });
   child.on('close', (code, signal) => {
@@ -95,17 +99,17 @@ function execAsRoot(cmd, args, done) {
 
 // Periodically ping mayastor until up and running.
 // Ping cb with grpc call is provided by the caller.
-function waitFor(ping, done) {
+function waitFor (ping, done) {
   let last_error;
   let iters = 0;
 
   async.whilst(
-    cb => {
+    (cb) => {
       cb(null, iters < 10);
     },
-    next => {
+    (next) => {
       iters++;
-      ping(err => {
+      ping((err) => {
         if (err) {
           last_error = err;
           setTimeout(next, 1000);
@@ -123,25 +127,25 @@ function waitFor(ping, done) {
 }
 
 // Find the first usable external IPv4 address on the system
-function getMyIp() {
-  let externIp = _.map(
+function getMyIp () {
+  const externIp = _.map(
     _.flatten(Object.values(os.networkInterfaces())),
     'address'
-  ).find(addr => addr.indexOf(':') < 0 && !addr.match(/^127\./));
+  ).find((addr) => addr.indexOf(':') < 0 && !addr.match(/^127\./));
   assert(externIp, 'Cannot determine external IP address of the system');
   return externIp;
 }
 
 // Common code for starting mayastor, mayastor-grpc and spdk processes.
-function startProcess(command, args, env, closeCb, psName) {
+function startProcess (command, args, env, closeCb, psName) {
   assert(!procs[command]);
-  let proc = runAsRoot(getCmdPath(command), args, env, psName);
+  const proc = runAsRoot(getCmdPath(command), args, env, psName);
   proc.output = [];
 
-  proc.stdout.on('data', data => {
+  proc.stdout.on('data', (data) => {
     proc.output.push(data);
   });
-  proc.stderr.on('data', data => {
+  proc.stderr.on('data', (data) => {
     proc.output.push(data);
   });
   proc.once('close', (code, signal) => {
@@ -156,7 +160,7 @@ function startProcess(command, args, env, closeCb, psName) {
 }
 
 // Start spdk process and return immediately.
-function startSpdk(config, args, env) {
+function startSpdk (config, args, env) {
   args = args || ['-r', SOCK];
   env = env || {};
 
@@ -170,7 +174,7 @@ function startSpdk(config, args, env) {
     args,
     _.assign(
       {
-        MAYASTOR_DELAY: '1',
+        MAYASTOR_DELAY: '1'
       },
       env
     ),
@@ -184,7 +188,7 @@ function startSpdk(config, args, env) {
 }
 
 // Start mayastor process and return immediately.
-function startMayastor(config, args, env) {
+function startMayastor (config, args, env) {
   args = args || ['-r', SOCK];
   env = env || {};
 
@@ -199,7 +203,7 @@ function startMayastor(config, args, env) {
     _.assign(
       {
         MY_POD_IP: getMyIp(),
-        MAYASTOR_DELAY: '1',
+        MAYASTOR_DELAY: '1'
       },
       env
     ),
@@ -213,36 +217,36 @@ function startMayastor(config, args, env) {
 }
 
 // Start mayastor-agent processes and return immediately.
-function startMayastorGrpc() {
+function startMayastorGrpc () {
   startProcess('mayastor-agent', [
     '-v',
     '-n',
     'test-node-id',
     '-a',
-    '127.0.0.1',
+    getMyIp(),
     '-p',
     GRPC_PORT.toString(),
     '-c',
     CSI_ENDPOINT,
     '-s',
-    SOCK,
+    SOCK
   ]);
 }
 
-function killSudoedProcess(name, pid, done) {
-  find('name', name).then(res => {
+function killSudoedProcess (name, pid, done) {
+  find('name', name).then((res) => {
     var whichPid;
     if (process.geteuid() === 0) {
       whichPid = 'pid';
     } else {
       whichPid = 'ppid';
     }
-    res = res.filter(ent => ent[whichPid] == pid);
+    res = res.filter((ent) => ent[whichPid] == pid);
     if (res.length == 0) {
       return done();
     }
-    let child = runAsRoot('kill', ['-s', 'SIGTERM', res[0].pid.toString()]);
-    child.stderr.on('data', data => {
+    const child = runAsRoot('kill', ['-s', 'SIGTERM', res[0].pid.toString()]);
+    child.stderr.on('data', (data) => {
       console.log('kill', name, 'error:', data.toString());
     });
     child.once('close', () => {
@@ -252,7 +256,7 @@ function killSudoedProcess(name, pid, done) {
 }
 
 // Kill all previously started processes.
-function stopAll(done) {
+function stopAll (done) {
   // Unfortunately the order in which the procs are stopped matters (hence the
   // sort()). In nexus tests if spdk proc with connected nvmf target is stopped
   // before nvmf initiator in mayastor, it exits with segfault. That's also the
@@ -260,9 +264,9 @@ function stopAll(done) {
   async.mapSeries(
     Object.keys(procs).sort(),
     (name, cb) => {
-      let proc = procs[name];
+      const proc = procs[name];
       console.log(`Stopping ${name} with pid ${proc.pid} ...`);
-      killSudoedProcess(name, proc.pid, err => {
+      killSudoedProcess(name, proc.pid, (err) => {
         if (err) return cb(null, err);
         // let other close event handlers on the process run
         setTimeout(cb, 0);
@@ -272,7 +276,7 @@ function stopAll(done) {
       assert(!err);
       procs = {};
       // return the first found error
-      done(errors.find(e => !!e));
+      done(errors.find((e) => !!e));
     }
   );
 }
@@ -281,14 +285,14 @@ function stopAll(done) {
 //
 // TODO: We don't restart the mayastor with the same parameters as we
 // don't remember params which were used for starting it.
-function restartMayastor(ping, done) {
-  let proc = procs.mayastor;
+function restartMayastor (ping, done) {
+  const proc = procs.mayastor;
   assert(proc);
 
   async.series(
     [
-      next => {
-        killSudoedProcess('mayastor', proc.pid, err => {
+      (next) => {
+        killSudoedProcess('mayastor', proc.pid, (err) => {
           if (err) return next(err);
           if (procs.mayastor) {
             procs.mayastor.once('close', next);
@@ -297,14 +301,14 @@ function restartMayastor(ping, done) {
           }
         });
       },
-      next => {
+      (next) => {
         // let other close event handlers on the process run
         setTimeout(next, 0);
       },
-      next => {
+      (next) => {
         startMayastor();
         waitFor(ping, next);
-      },
+      }
     ],
     done
   );
@@ -314,14 +318,14 @@ function restartMayastor(ping, done) {
 //
 // TODO: We don't restart the process with the same parameters as we
 // don't remember params which were used for starting it.
-function restartMayastorGrpc(ping, done) {
-  let proc = procs['mayastor-agent'];
+function restartMayastorGrpc (ping, done) {
+  const proc = procs['mayastor-agent'];
   assert(proc);
 
   async.series(
     [
-      next => {
-        killSudoedProcess('mayastor-agent', proc.pid, err => {
+      (next) => {
+        killSudoedProcess('mayastor-agent', proc.pid, (err) => {
           if (err) return next(err);
           if (procs['mayastor-agent']) {
             procs['mayastor-agent'].once('close', next);
@@ -330,21 +334,21 @@ function restartMayastorGrpc(ping, done) {
           }
         });
       },
-      next => {
+      (next) => {
         // let other close event handlers on the process run
         setTimeout(next, 0);
       },
-      next => {
+      (next) => {
         startMayastorGrpc();
         waitFor(ping, next);
-      },
+      }
     ],
     done
   );
 }
 
 // Execute rpc method using dumb jsonrpc client
-function dumbCommand(method, args, done) {
+function dumbCommand (method, args, done) {
   exec(
     '../target/debug/mctl -s ' +
       SOCK +
@@ -366,10 +370,10 @@ function dumbCommand(method, args, done) {
 
 // Ensure that /dev/nbd* devices are writable by the current process.
 // If running as root this is a noop.
-function ensureNbdWritable(done) {
+function ensureNbdWritable (done) {
   if (process.geteuid() != 0) {
-    let child = runAsRoot('sh', ['-c', 'chmod o+rw /dev/nbd*']);
-    child.stderr.on('data', data => {
+    const child = runAsRoot('sh', ['-c', 'chmod o+rw /dev/nbd*']);
+    child.stderr.on('data', (data) => {
       console.log(data.toString());
     });
     child.on('close', (code, signal) => {
@@ -386,12 +390,12 @@ function ensureNbdWritable(done) {
 
 // Unix domain socket client does not run with root privs (in general) so open
 // the socket to everyone.
-function fixSocketPerms(done) {
-  let child = runAsRoot('chmod', ['a+rw', CSI_ENDPOINT]);
-  child.stderr.on('data', data => {
-    //console.log('chmod', 'error:', data.toString());
+function fixSocketPerms (done) {
+  const child = runAsRoot('chmod', ['a+rw', CSI_ENDPOINT]);
+  child.stderr.on('data', (data) => {
+    // console.log('chmod', 'error:', data.toString());
   });
-  child.on('close', code => {
+  child.on('close', (code) => {
     if (code != 0) {
       done('Failed to chmod the socket' + code);
     } else {
@@ -401,9 +405,9 @@ function fixSocketPerms(done) {
 }
 
 // Undo change to perms of nbd devices done in ensureNbdWritable().
-function restoreNbdPerms(done) {
+function restoreNbdPerms (done) {
   if (process.geteuid() != 0) {
-    let child = runAsRoot('sh', ['-c', 'chmod o-rw /dev/nbd*']);
+    const child = runAsRoot('sh', ['-c', 'chmod o-rw /dev/nbd*']);
     child.on('close', (code, signal) => {
       if (code != 0) {
         done(new Error('Failed to chmod nbd devs'));
@@ -428,12 +432,12 @@ module.exports = {
   restartMayastor,
   restartMayastorGrpc,
   fixSocketPerms,
-  endpoint,
+  grpc_endpoint,
   dumbCommand,
   execAsRoot,
   runAsRoot,
   ensureNbdWritable,
   restoreNbdPerms,
   getMyIp,
-  getCmdPath,
+  getCmdPath
 };

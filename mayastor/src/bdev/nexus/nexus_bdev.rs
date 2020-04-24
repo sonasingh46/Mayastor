@@ -47,7 +47,7 @@ use crate::{
             nexus_nbd::{NbdDisk, NbdError},
         },
     },
-    core::{Bdev, DmaBuf, DmaError},
+    core::{Bdev, DmaError},
     ffihelper::errno_result_from_i32,
     jsonrpc::{Code, RpcErrorCode},
     nexus_uri::BdevCreateDestroy,
@@ -441,56 +441,14 @@ impl Nexus {
     }
 
     pub async fn sync_labels(&mut self) -> Result<(), Error> {
-        if let Ok(label) = self.update_child_labels().await {
-            // now register the bdev but update its size first to
-            // ensure we adhere to the partitions
+        let label = self.update_child_labels().await.context(WriteLabel {
+            name: self.name.clone(),
+        })?;
 
-            // When the GUID does not match the given UUID it means
-            // that the PVC has been recreated, in such a
-            // case we should consider updating the labels
-
-            info!("{}: {} ", self.name, label);
-            self.data_ent_offset = label.offset();
-            self.bdev.set_block_count(label.get_block_count());
-        } else {
-            // one or more children do not have, or have an invalid gpt label.
-            // Recalculate what the header should have been and
-            // write them out
-
-            info!(
-                "{}: Child label(s) mismatch or absent, applying new label(s)",
-                self.name
-            );
-
-            let mut label = self.generate_label();
-            self.data_ent_offset = label.offset();
-            self.bdev.set_block_count(label.get_block_count());
-
-            let blk_size = self.bdev.block_len();
-            let mut buf = DmaBuf::new(
-                (blk_size * (((1 << 14) / blk_size) + 1)) as usize,
-                self.bdev.alignment(),
-            )
-            .context(AllocLabel {
-                name: self.name.clone(),
-            })?;
-
-            self.write_label(&mut buf, &mut label, true).await.context(
-                WriteLabel {
-                    name: self.name.clone(),
-                },
-            )?;
-            self.write_label(&mut buf, &mut label, false)
-                .await
-                .context(WriteLabel {
-                    name: self.name.clone(),
-                })?;
-            info!("{}: {} ", self.name, label);
-
-            self.write_pmbr().await.context(WritePmbr {
-                name: self.name.clone(),
-            })?;
-        }
+        // Now register the bdev but update its size first
+        // to ensure we adhere to the partitions.
+        self.data_ent_offset = label.offset();
+        self.bdev.set_block_count(label.get_block_count());
 
         Ok(())
     }

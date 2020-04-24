@@ -43,7 +43,7 @@ describe('moac', function () {
 
   // Start moac without k8s just to test basic errors
   it('start moac process', (done) => {
-    let child = spawn(path.join(__dirname, '..', 'index.js'), ['-s']);
+    const child = spawn(path.join(__dirname, '..', 'index.js'), ['-s']);
     let stderr = '';
 
     child.stdout.on('data', (data) => {

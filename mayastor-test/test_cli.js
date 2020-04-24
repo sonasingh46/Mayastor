@@ -36,7 +36,7 @@ var mayastorMockServer;
 // we use in the tests below. Note that the request must exactly match the
 // object specified in rules. If not, the server does not reply and the client
 // will hang.
-function runMockServer(rules) {
+function runMockServer (rules) {
   mayastorMockServer = createMockServer({
     protoPath: path.join(
       __dirname,
@@ -47,7 +47,7 @@ function runMockServer(rules) {
     ),
     packageName: 'mayastor_service',
     serviceName: 'Mayastor',
-    rules: rules,
+    rules: rules
   });
 
   mayastorMockServer.listen('127.0.0.1:' + EGRESS_PORT);
@@ -63,16 +63,16 @@ describe('cli', function () {
           input: {
             name: POOL,
             disks: [DISK],
-            blockSize: 512,
+            blockSize: 512
           },
-          output: {},
+          output: {}
         },
         {
           method: 'DestroyPool',
           input: {
-            name: POOL,
+            name: POOL
           },
-          output: {},
+          output: {}
         },
         {
           method: 'ListPools',
@@ -84,17 +84,17 @@ describe('cli', function () {
                 disks: [DISK + '1'],
                 state: 0,
                 capacity: 100 * (1024 * 1024),
-                used: 50 * (1024 * 1024),
+                used: 50 * (1024 * 1024)
               },
               {
                 name: POOL + '2',
                 disks: [DISK + '2a', DISK + '2b'],
                 state: 1,
                 capacity: 1000 * (1024 * 1024),
-                used: 99 * (1024 * 1024),
-              },
-            ],
-          },
+                used: 99 * (1024 * 1024)
+              }
+            ]
+          }
         },
         {
           method: 'CreateReplica',
@@ -103,28 +103,28 @@ describe('cli', function () {
             pool: POOL,
             size: { low: 1000 * (1024 * 1024), high: 0, unsigned: true },
             thin: true,
-            share: 1,
+            share: 1
           },
           output: {
-            uri: 'nvmf://192.168.0.1:4444/' + UUID,
-          },
+            uri: 'nvmf://192.168.0.1:4444/' + UUID
+          }
         },
         {
           method: 'DestroyReplica',
           input: {
-            uuid: UUID,
+            uuid: UUID
           },
-          output: {},
+          output: {}
         },
         {
           method: 'ShareReplica',
           input: {
             uuid: UUID,
-            share: 2,
+            share: 2
           },
           output: {
-            uri: 'iscsi://192.168.0.1:4444/' + UUID,
-          },
+            uri: 'iscsi://192.168.0.1:4444/' + UUID
+          }
         },
         {
           method: 'ListReplicas',
@@ -137,7 +137,7 @@ describe('cli', function () {
                 thin: true,
                 share: 0,
                 uri: 'bdev:///' + UUID,
-                size: 10000 * (1024 * 1024),
+                size: 10000 * (1024 * 1024)
               },
               {
                 uuid: UUID2,
@@ -145,7 +145,7 @@ describe('cli', function () {
                 thin: false,
                 share: 1,
                 uri: 'nvmf://192.168.0.1:4444/' + UUID,
-                size: 10 * (1024 * 1024),
+                size: 10 * (1024 * 1024)
               },
               {
                 uuid: UUID3,
@@ -153,10 +153,10 @@ describe('cli', function () {
                 thin: false,
                 share: 2,
                 uri: 'iscsi://192.168.0.1:4444/' + UUID,
-                size: 10 * (1024 * 1024),
-              },
-            ],
-          },
+                size: 10 * (1024 * 1024)
+              }
+            ]
+          }
         },
         {
           method: 'StatReplicas',
@@ -170,8 +170,8 @@ describe('cli', function () {
                   numReadOps: { low: 10000, high: 0, unsigned: true },
                   numWriteOps: { low: 0, high: 0, unsigned: true },
                   bytesRead: { low: 10000000, high: 0, unsigned: true },
-                  bytesWritten: { low: 0, high: 0, unsigned: true },
-                },
+                  bytesWritten: { low: 0, high: 0, unsigned: true }
+                }
               },
               {
                 uuid: UUID2,
@@ -180,12 +180,12 @@ describe('cli', function () {
                   numReadOps: { low: 1, high: 0, unsigned: true },
                   numWriteOps: { low: 200000, high: 0, unsigned: true },
                   bytesRead: { low: 1000, high: 0, unsigned: true },
-                  bytesWritten: { low: 200000000, high: 0, unsigned: true },
-                },
-              },
-            ],
-          },
-        },
+                  bytesWritten: { low: 200000000, high: 0, unsigned: true }
+                }
+              }
+            ]
+          }
+        }
       ]);
     });
 
@@ -217,7 +217,7 @@ describe('cli', function () {
       const cmd = util.format('%s -q pool list', EGRESS_CMD);
 
       exec(cmd, (err, stdout, stderr) => {
-        let pools = [];
+        const pools = [];
 
         if (err) {
           return done(err);
@@ -225,7 +225,7 @@ describe('cli', function () {
         assert.isEmpty(stderr);
 
         stdout.split('\n').forEach((line) => {
-          let parts = line
+          const parts = line
             .trim()
             .split(' ')
             .filter((s) => s.length != 0);
@@ -241,7 +241,7 @@ describe('cli', function () {
             capacity_unit: parts[3],
             used: parts[4],
             used_unit: parts[5],
-            disks: parts.slice(6),
+            disks: parts.slice(6)
           });
         });
 
@@ -315,7 +315,7 @@ describe('cli', function () {
       const cmd = util.format('%s -q replica list', EGRESS_CMD);
 
       exec(cmd, (err, stdout, stderr) => {
-        let repls = [];
+        const repls = [];
 
         if (err) {
           return done(err);
@@ -323,7 +323,7 @@ describe('cli', function () {
         assert.isEmpty(stderr);
 
         stdout.split('\n').forEach((line) => {
-          let parts = line
+          const parts = line
             .trim()
             .split(' ')
             .filter((s) => s.length != 0);
@@ -339,7 +339,7 @@ describe('cli', function () {
             share: parts[3],
             size: parts[4],
             size_unit: parts[5],
-            uri: parts[6],
+            uri: parts[6]
           });
         });
 
@@ -377,7 +377,7 @@ describe('cli', function () {
       const cmd = util.format('%s -q replica stats', EGRESS_CMD);
 
       exec(cmd, (err, stdout, stderr) => {
-        let repls = [];
+        const repls = [];
 
         if (err) {
           return done(err);
@@ -385,7 +385,7 @@ describe('cli', function () {
         assert.isEmpty(stderr);
 
         stdout.split('\n').forEach((line) => {
-          let parts = line
+          const parts = line
             .trim()
             .split(' ')
             .filter((s) => s.length != 0);
@@ -400,7 +400,7 @@ describe('cli', function () {
             num_read_ops: parts[2],
             num_write_ops: parts[3],
             bytes_read: parts[4],
-            bytes_written: parts[5],
+            bytes_written: parts[5]
           });
         });
 
@@ -446,30 +446,30 @@ describe('cli', function () {
           method: 'CreatePool',
           input: {
             name: POOL,
-            disks: [DISK],
+            disks: [DISK]
           },
           error: {
             code: 6, // ALREADY_EXISTS
-            message: 'Pool already exists',
-          },
+            message: 'Pool already exists'
+          }
         },
         {
           method: 'DestroyPool',
           input: {
-            name: POOL,
+            name: POOL
           },
           error: {
             code: 5, // NOT_FOUND
-            message: 'Pool not found',
-          },
+            message: 'Pool not found'
+          }
         },
         {
           method: 'ListPools',
           input: {},
           error: {
             code: 2, // UNKNOWN
-            message: 'Internal error',
-          },
+            message: 'Internal error'
+          }
         },
         {
           method: 'CreateReplica',
@@ -477,50 +477,50 @@ describe('cli', function () {
             uuid: UUID,
             pool: POOL,
             size: { low: 1000 * (1024 * 1024), high: 0, unsigned: true },
-            thin: true,
+            thin: true
           },
           error: {
             code: 6, // ALREADY_EXISTS
-            message: 'Replica already exists',
-          },
+            message: 'Replica already exists'
+          }
         },
         {
           method: 'DestroyReplica',
           input: {
-            uuid: UUID,
+            uuid: UUID
           },
           error: {
             code: 5, // NOT_FOUND
-            message: 'Replica not found',
-          },
+            message: 'Replica not found'
+          }
         },
         {
           method: 'ShareReplica',
           input: {
             uuid: UUID,
-            share: 1,
+            share: 1
           },
           error: {
             code: 5, // NOT_FOUND
-            message: 'Replica not found',
-          },
+            message: 'Replica not found'
+          }
         },
         {
           method: 'ListReplicas',
           input: {},
           error: {
             code: 2, // UNKNOWN
-            message: 'Internal error',
-          },
+            message: 'Internal error'
+          }
         },
         {
           method: 'StatReplicas',
           input: {},
           error: {
             code: 2, // UNKNOWN
-            message: 'Internal error',
-          },
-        },
+            message: 'Internal error'
+          }
+        }
       ]);
     });
 
