@@ -104,7 +104,7 @@ impl NexusFnTable {
                     nexus.writev(io, &ch)
                 }
                 io_type::RESET => {
-                    //trace!("{}: Dispatching WRITE {:p}", nexus.name(), io);
+                    trace!("{}: Dispatching RESET {:p}", nexus.bdev.name(), io);
                     nexus.reset(io, &ch)
                 }
                 io_type::UNMAP => {
