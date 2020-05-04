@@ -15,9 +15,11 @@ use crate::{
             NexusTarget,
             ShareIscsiNexus,
             ShareNbdNexus,
+            ShareNvmfNexus,
         },
         nexus_iscsi::NexusIscsiTarget,
         nexus_nbd::NbdDisk,
+        nexus_nvmf::NexusNvmfTarget,
     },
     core::Bdev,
     ffihelper::{cb_arg, done_errno_cb, errno_result_from_i32, ErrnoResult},
@@ -60,6 +62,17 @@ impl Nexus {
                 } else {
                     warn!("{} is already shared", self.name);
                     return Ok(iscsi_target.as_uri());
+                }
+            }
+            Some(NexusTarget::NexusNvmfTarget(ref nvmf_target)) => {
+                if share_protocol != ShareProtocolNexus::NexusNvmf {
+                    // TOMTODO Commonise this stuff
+                    return Err(Error::AlreadyShared {
+                        name: self.name.clone(),
+                    });
+                } else {
+                    warn!("{} is already shared", self.name);
+                    return Ok(nvmf_target.as_uri());
                 }
             }
             None => (),
@@ -124,9 +137,31 @@ impl Nexus {
                 uri
             }
             ShareProtocolNexus::NexusNvmf => {
-                return Err(Error::InvalidShareProtocol {
-                    sp_value: share_protocol as i32,
-                })
+                let nvmf_target = NexusNvmfTarget::create(&name)
+                    .await
+                    .context(ShareNvmfNexus {
+                        name: self.name.clone(),
+                    })?;
+                self.nexus_target =
+                    Some(NexusTarget::NexusNvmfTarget(nvmf_target));
+                name.clone()
+                /*
+                println!("TM Handling nvmf");
+                let bdev = match Bdev::lookup_by_name(&name) {
+                    None => {
+                        return Err(Error::NotShared { // TOMTODO Not right, but whatever.
+                            name: name.to_string(),
+                        })
+                    }
+                    Some(bd) => bd,
+                };
+
+                target::nvmf::share(&name, &bdev)
+                .await
+                .context(crate::bdev::nexus::nexus_bdev::ShareNvmf {
+                })?;
+                name.clone() // TOMTODO Not right.
+                */
             }
         };
         self.share_handle = Some(name);
@@ -144,6 +179,9 @@ impl Nexus {
             }
             Some(NexusTarget::NexusIscsiTarget(iscsi_target)) => {
                 iscsi_target.destroy().await;
+            }
+            Some(NexusTarget::NexusNvmfTarget(nvmf_target)) => {
+                nvmf_target.destroy().await;
             }
             None => {
                 warn!("{} was not shared", self.name);

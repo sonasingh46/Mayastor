@@ -16,7 +16,7 @@ const grpc = require('grpc');
 const common = require('./test_common');
 const enums = require('./grpc_enums');
 
-const POOL = 'tpool';
+const POOL = 'tpool'; // TOMTODO Commonise with nexus code
 const DISK_FILE = '/tmp/mayastor_test_disk';
 // arbitrary uuid used for creating a replica
 const UUID = 'dbe4d7eb-118a-4d15-b789-a18d9af6ff21';
@@ -602,6 +602,7 @@ describe('replica', function () {
       });
     }
 
+    // TOMTODO Commonise with the nexus test??
     before((done) => {
       const buf = Buffer.alloc(4096, 'm');
 
@@ -662,6 +663,7 @@ describe('replica', function () {
     });
 
     it('should write to nvmf replica', (done) => {
+      console.log(uri);
       common.execAsRoot(
         common.getCmdPath('initiator'),
         ['--offset=4096', uri, 'write', blockFile],

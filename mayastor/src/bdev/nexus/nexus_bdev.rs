@@ -44,6 +44,7 @@ use crate::{
             nexus_iscsi::{NexusIscsiError, NexusIscsiTarget},
             nexus_label::LabelError,
             nexus_nbd::{NbdDisk, NbdError},
+            nexus_nvmf::{NexusNvmfError, NexusNvmfTarget},
         },
     },
     core::{Bdev, DmaError},
@@ -51,6 +52,7 @@ use crate::{
     jsonrpc::{Code, RpcErrorCode},
     nexus_uri::BdevCreateDestroy,
     rebuild::{RebuildError, RebuildTask},
+    target,
 };
 
 /// Common errors for nexus basic operations and child operations
@@ -73,6 +75,8 @@ pub enum Error {
         name
     ))]
     AlreadyShared { name: String },
+    #[snafu(display("share nvmf"))]
+    ShareNvmf { source: target::nvmf::Error },
     #[snafu(display("The nexus {} has not been shared", name))]
     NotShared { name: String },
     #[snafu(display("Failed to share nexus over NBD {}", name))]
@@ -80,6 +84,11 @@ pub enum Error {
     #[snafu(display("Failed to share iscsi nexus {}", name))]
     ShareIscsiNexus {
         source: NexusIscsiError,
+        name: String,
+    },
+    #[snafu(display("Failed to share nvmf nexus {}", name))]
+    ShareNvmfNexus {
+        source: NexusNvmfError,
         name: String,
     },
     #[snafu(display("Failed to allocate label of nexus {}", name))]
@@ -260,6 +269,7 @@ pub(crate) static NEXUS_PRODUCT_ID: &str = "Nexus CAS Driver v0.0.1";
 pub enum NexusTarget {
     NbdDisk(NbdDisk),
     NexusIscsiTarget(NexusIscsiTarget),
+    NexusNvmfTarget(NexusNvmfTarget),
 }
 
 impl fmt::Debug for NexusTarget {
@@ -267,6 +277,7 @@ impl fmt::Debug for NexusTarget {
         match self {
             NexusTarget::NbdDisk(disk) => fmt::Debug::fmt(&disk, f),
             NexusTarget::NexusIscsiTarget(tgt) => fmt::Debug::fmt(&tgt, f),
+            NexusTarget::NexusNvmfTarget(tgt) => fmt::Debug::fmt(&tgt, f),
         }
     }
 }

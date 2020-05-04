@@ -663,6 +663,10 @@ impl MayastorEnvironment {
         crate::pool::register_pool_methods();
         crate::replica::register_replica_methods();
 
+        if self.delay_subsystem_init {
+            return self;
+        }
+
         // init the subsystems
         Reactor::block_on(async {
             unsafe {
