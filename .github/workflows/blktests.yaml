@@ -37,6 +37,7 @@ jobs:
   Blktests:
     name: Run blktests
     runs-on: ubuntu-latest
+    needs: Build
     steps:
       - uses: actions/checkout@v2
         with:
