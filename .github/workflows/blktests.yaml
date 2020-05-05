@@ -1,0 +1,65 @@
+name: "Mayastor tests"
+on:
+  push:
+    branches:
+      - blktests
+jobs:
+  Build:
+    name: Build and run cargo tests
+    runs-on: self-hosted
+    timeout-minutes: 20
+    container:
+      image: docker.io/mayadata/ms-buildenv:nix
+      options: --privileged -v /dev:/dev -v /bin:/host/bin -v /lib/modules:/lib/modules
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          # this does not pin the compiler version
+          toolchain: stable
+      - run: ln -s /host/bin/kmod /bin/modprobe
+      - run: /bin/modprobe nbd
+      - run: /bin/modprobe xfs
+      - run: /bin/modprobe nvme_tcp
+      - run: echo 2048 | tee /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
+      - run: rm mayastor/.cargo/config
+      - run: rm nvmeadm/.cargo/config
+      - run: cargo build --all
+      - run: ( cd jsonrpc && cargo test )
+      - run: ( cd mayastor && cargo test -- --test-threads=1 )
+      - run: mkdir ./target/debug/github-artifacts/
+      - run: ( cd ./target/debug/ && cp mayastor mayastor-client mayastor-agent spdk initiator mctl github-artifacts/ )
+      - run: ( cd nvmeadm && cargo test )
+      - uses: actions/upload-artifact@v2
+        with:
+          name: mayastor
+          path: ./target/debug/github-artifacts
+  Blktests:
+    name: Run blktests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          repository: osandov/blktests
+      - uses: actions/download-artifact@v2
+        with:
+          name: mayastor
+          path: ./mayastor
+      - run: sudo modprobe {nbd,xfs,nvme_tcp}
+      - run: echo 2048 | tee /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
+      - run: sudo ./mayastor/mayastor &
+      - run: sudo apt-get install build-essentials fio e2fsprogs xfsprogs multipath-tools dmsetup blktrace nbd-server nbd-client open-iscsi jq
+      - run: make
+      - run: truncate /tmp/foo --size 1GiB
+      - run: echo "::set-env name=NEXUS_UUID::$(uuidgen)"
+      - run: ./mayastor/mctl create target/debug/mctl create $NEXUS_UUID --children aio://127.0.0.1/tmp/foo?blk_size=512 --size 1GiB
+      - run: ./mayastor/mctl publish $(./mayastor/mctl list | jq -r .nexus_list[0].uuid) NBD
+      - run: DEVICE_ONLY=1 TEST_DEVS=(/dev/nbd0) sudo ./check -x nbd/003 -x nvme
+      - run: ./mayastor/mctl destroy $NEXUS_UUID
+      - run: echo "::set-env name=NEXUS_UUID::$(uuidgen)"
+      - run: ./mayastor/mctl create target/debug/mctl create $NEXUS_UUID --children aio://127.0.0.1/tmp/foo?blk_size=512 --size 1GiB
+      - run: ./mayastor/mctl publish $(./mayastor/mctl list | jq -r .nexus_list[0].uuid) ISCSI
+      - run: sudo iscsiadm -m discovery -t st -p localhost
+      - run: sudo iscsiadm --mode node --targetname iqn.2019-05.io.openebs:nexus-152a45f2-b659-4494-b494-533fee3b701e --portal localhost --login
+      - run: DEVICE_ONLY=1 TEST_DEVS=(/dev/${lsblk -SJ | jq -r '.blockdevices[]|select(.model=="Nexus_CAS_Driver").name'}) sudo ./check -x nbd/003 -x nvme
+      - run: ./mayastor/mctl destroy $NEXUS_UUID
