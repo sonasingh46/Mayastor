@@ -46,8 +46,8 @@ jobs:
         with:
           name: mayastor
           path: ./mayastor
+      - run: chown -R $(id -n):$(id -g) mayastor/
       - run: ls -l ./mayastor/
-      - run: id
       - run: sudo modprobe {nbd,xfs,nvme_tcp}
       - run: echo 2048 | sudo tee /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
       - run: sudo ./mayastor/mayastor &
