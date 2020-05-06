@@ -46,6 +46,7 @@ jobs:
         with:
           name: mayastor
           path: ./mayastor
+      - run: ls -l ./mayastor/
       - run: sudo modprobe {nbd,xfs,nvme_tcp}
       - run: echo 2048 | sudo tee /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
       - run: sudo ./mayastor/mayastor &
@@ -54,12 +55,12 @@ jobs:
       - run: make
       - run: truncate /tmp/foo --size 1GiB
       - run: echo "::set-env name=NEXUS_UUID::$(uuidgen)"
-      - run: ./mayastor/mctl create target/debug/mctl create $NEXUS_UUID --children aio://127.0.0.1/tmp/foo?blk_size=512 --size 1GiB
+      - run: ./mayastor/mctl create $NEXUS_UUID --children aio://127.0.0.1/tmp/foo?blk_size=512 --size 1GiB
       - run: ./mayastor/mctl publish $(./mayastor/mctl list | jq -r .nexus_list[0].uuid) NBD
       - run: DEVICE_ONLY=1 TEST_DEVS=(/dev/nbd0) sudo ./check -x nbd/003 -x nvme
       - run: ./mayastor/mctl destroy $NEXUS_UUID
       - run: echo "::set-env name=NEXUS_UUID::$(uuidgen)"
-      - run: ./mayastor/mctl create target/debug/mctl create $NEXUS_UUID --children aio://127.0.0.1/tmp/foo?blk_size=512 --size 1GiB
+      - run: ./mayastor/mctl create $NEXUS_UUID --children aio://127.0.0.1/tmp/foo?blk_size=512 --size 1GiB
       - run: ./mayastor/mctl publish $(./mayastor/mctl list | jq -r .nexus_list[0].uuid) ISCSI
       - run: sudo iscsiadm -m discovery -t st -p localhost
       - run: sudo iscsiadm --mode node --targetname iqn.2019-05.io.openebs:nexus-152a45f2-b659-4494-b494-533fee3b701e --portal localhost --login
