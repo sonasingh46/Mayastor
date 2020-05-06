@@ -47,11 +47,12 @@ jobs:
         with:
           name: mayastor
           path: ./mayastor
-      - run: chown -R $(id -n):$(id -g) mayastor/
       - run: chmod -R a+x mayastor/
       - run: ls -l ./mayastor/
       - run: sudo modprobe {nbd,xfs,nvme_tcp}
       - run: echo 2048 | sudo tee /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
+      - run: sudo ls -l
+      - run: sudo ls -l .mayastor/
       - run: sudo ./mayastor/mayastor &
       - run: sudo apt-get update
       - run: sudo apt-get install build-essential fio e2fsprogs xfsprogs multipath-tools dmsetup blktrace nbd-server nbd-client open-iscsi jq
