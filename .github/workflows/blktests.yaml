@@ -61,7 +61,7 @@ jobs:
       - run: ls -l ./mayastor/
       - run: ldd ./mayastor/mctl
       - run: ldd ./mayastor/mayastor
-      - run: ./mayastor/mayastor
+      - run: ./mayastor/mayastor &
       - run: apt-get update
       - run: apt-get install build-essential fio e2fsprogs xfsprogs multipath-tools dmsetup blktrace nbd-server nbd-client open-iscsi jq
       - run: make
