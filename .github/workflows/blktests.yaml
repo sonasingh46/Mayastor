@@ -52,27 +52,27 @@ jobs:
           path: ./mayastor
       - run: chmod -R a+x mayastor/
       - run: ls -l ./mayastor/
-      - run: sudo modprobe {nbd,xfs,nvme_tcp}
-      - run: echo 2048 | sudo tee /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
+      - run: modprobe {nbd,xfs,nvme_tcp}
+      - run: echo 2048 | tee /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
       - run: ls -l
       - run: ls -l ./mayastor/
       - run: ldd ./mayastor/mctl
       - run: ldd ./mayastor/mayastor
-      - run: sudo ./mayastor/mayastor
-      - run: sudo apt-get update
-      - run: sudo apt-get install build-essential fio e2fsprogs xfsprogs multipath-tools dmsetup blktrace nbd-server nbd-client open-iscsi jq
+      - run: ./mayastor/mayastor
+      - run: apt-get update
+      - run: apt-get install build-essential fio e2fsprogs xfsprogs multipath-tools dmsetup blktrace nbd-server nbd-client open-iscsi jq
       - run: make
       - run: truncate /tmp/foo --size 1GiB
       - run: echo "::set-env name=NEXUS_UUID::$(uuidgen)"
       - run: ./mayastor/mctl
       - run: ./mayastor/mctl create $NEXUS_UUID --children aio://127.0.0.1/tmp/foo?blk_size=512 --size 1GiB
       - run: ./mayastor/mctl publish $(./mayastor/mctl list | jq -r .nexus_list[0].uuid) NBD
-      - run: DEVICE_ONLY=1 TEST_DEVS=(/dev/nbd0) sudo ./check -x nbd/003 -x nvme
+      - run: DEVICE_ONLY=1 TEST_DEVS=(/dev/nbd0) ./check -x nbd/003 -x nvme
       - run: ./mayastor/mctl destroy $NEXUS_UUID
       - run: echo "::set-env name=NEXUS_UUID::$(uuidgen)"
       - run: ./mayastor/mctl create $NEXUS_UUID --children aio://127.0.0.1/tmp/foo?blk_size=512 --size 1GiB
       - run: ./mayastor/mctl publish $(./mayastor/mctl list | jq -r .nexus_list[0].uuid) ISCSI
-      - run: sudo iscsiadm -m discovery -t st -p localhost
-      - run: sudo iscsiadm --mode node --targetname iqn.2019-05.io.openebs:nexus-152a45f2-b659-4494-b494-533fee3b701e --portal localhost --login
-      - run: DEVICE_ONLY=1 TEST_DEVS=(/dev/${lsblk -SJ | jq -r '.blockdevices[]|select(.model=="Nexus_CAS_Driver").name'}) sudo ./check -x nbd/003 -x nvme
+      - run: iscsiadm -m discovery -t st -p localhost
+      - run: iscsiadm --mode node --targetname iqn.2019-05.io.openebs:nexus-152a45f2-b659-4494-b494-533fee3b701e --portal localhost --login
+      - run: DEVICE_ONLY=1 TEST_DEVS=(/dev/${lsblk -SJ | jq -r '.blockdevices[]|select(.model=="Nexus_CAS_Driver").name'}) ./check -x nbd/003 -x nvme
       - run: ./mayastor/mctl destroy $NEXUS_UUID
