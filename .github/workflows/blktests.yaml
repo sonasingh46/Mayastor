@@ -55,7 +55,7 @@ jobs:
       - run: ln -s /host/bin/kmod /bin/modprobe
       - run: /bin/modprobe nbd
       - run: /bin/modprobe xfs
-      - run: /bin/modprobe nvme_tcp
+      #- run: /bin/modprobe nvme_tcp
       - run: echo 2048 | tee /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
       - run: ls -l
       - run: ls -l ./mayastor/
