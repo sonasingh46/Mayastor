@@ -80,7 +80,7 @@ pub struct Reactor {
 
 thread_local! {
     /// This queue holds any in coming futures from other cores
-    static QUEUE: (Sender<async_task::Task<()>>, Receiver<async_task::Task<()>>) = unbounded();
+    static QUEUE: (Sender<async_task::Task<u32>>, Receiver<async_task::Task<u32>>) = unbounded();
 }
 
 impl Reactors {
@@ -226,7 +226,7 @@ impl Reactor {
     }
 
     /// spawn a future locally on this core
-    pub fn spawn_local<F, R>(&self, future: F) -> async_task::JoinHandle<R, ()>
+    pub fn spawn_local<F, R>(&self, future: F) -> async_task::JoinHandle<R, u32>
     where
         F: Future<Output = R> + 'static,
         R: 'static,
@@ -236,7 +236,8 @@ impl Reactor {
         // busy etc.
         let schedule = |t| QUEUE.with(|(s, _)| s.send(t).unwrap());
 
-        let (task, handle) = async_task::spawn_local(future, schedule, ());
+        let (task, handle) =
+            async_task::spawn_local(future, schedule, Cores::current());
         task.schedule();
         // the handler typically has no meaning to us unless we want to wait for
         // the spawned future to complete before we continue which is
@@ -255,8 +256,22 @@ impl Reactor {
         // context of the first thread.
         let reactor = Reactors::current();
         reactor.thread_enter();
-        let schedule = |t| QUEUE.with(|(s, _)| s.send(t).unwrap());
-        let (task, handle) = async_task::spawn_local(future, schedule, ());
+        let schedule = |t: async_task::Task<u32>| {
+            let core = *t.tag();
+
+            log::error!("Sending it from core {} to core {}", Cores::current(), core);
+
+            if core == Cores::current() {
+                QUEUE.with(|(s, _)| s.send(t).unwrap());
+            } else {
+                let f = async move {
+                    QUEUE.with(|(s, _)| s.send(t).unwrap());
+                };
+                Reactors::get_by_core(core).unwrap().send_future(f);
+            }
+        };
+        let (task, handle) =
+            async_task::spawn_local(future, schedule, reactor.lcore);
 
         let waker = handle.waker();
         let cx = &mut Context::from_waker(&waker);

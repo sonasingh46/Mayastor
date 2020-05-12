@@ -23,6 +23,7 @@ path = "src/bin/uring-support.rs"
 [dev-dependencies]
 assert_matches = "1.2"
 run_script = "*"
+async-std = {"version" = "1.5.0", features = ["attributes"]}
 
 [dependencies]
 async-task = "1.3.1"

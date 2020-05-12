@@ -180,14 +180,20 @@ async fn nexus_add_child(new_child: u64, wait: bool) {
     let nexus = nexus_lookup(NEXUS_NAME).unwrap();
 
     nexus.add_child(&get_dev(new_child)).await.unwrap();
-    let _ = nexus.start_rebuild(&get_dev(new_child)).await.unwrap();
+    let chan = nexus.start_rebuild(&get_dev(new_child)).await.unwrap();
 
     if wait {
-        common::wait_for_rebuild(
-            get_dev(new_child),
-            RebuildState::Completed,
-            std::time::Duration::from_secs(10),
-        );
+        let dur = std::time::Duration::from_secs(10);
+        async_std::future::timeout(dur, chan)
+            .await
+            .expect("should not time out")
+            .ok();
+
+        // common::wait_for_rebuild(
+        //     get_dev(new_child),
+        //     RebuildState::Completed,
+        //     std::time::Duration::from_secs(10),
+        // );
 
         nexus_test_child(new_child).await;
     } else {
